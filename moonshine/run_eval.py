@@ -25,21 +25,24 @@ def main(args):
     def benchmark(batch, min_new_tokens=None):
         # Load audio inputs
         audios = [audio["array"] for audio in batch["audio"]]
-        batch_size = max([len(audio) for audio in audios])
-        audios = [np.pad(audio, (0, batch_size - audio.shape[-1])) for audio in audios]
+        masks = [np.ones(audio.shape) for audio in audios]
+        batch_len = max([len(audio) for audio in audios])
+        audios = [np.pad(audio, (0, batch_len - audio.shape[-1])) for audio in audios]
+        masks = [np.pad(mask, (0, batch_len - mask.shape[-1])) for mask in masks]
         minibatch_size = len(audios)
 
         # START TIMING
         start_time = time.time()
 
-        np_arr = np.expand_dims(np.array(audios), 1)
-        input_tensor = torch.FloatTensor(np_arr)
+        input_tensor = torch.FloatTensor(np.array(audios)).to(args.device).to(torch.bfloat16)
+        mask_tensor = torch.FloatTensor(np.array(masks)).to(args.device).to(torch.bfloat16)
         moonshine_min_input_size = 1024
-        padding = moonshine_min_input_size - input_tensor.shape[1]
+        padding = moonshine_min_input_size - input_tensor.shape[-1]
         if padding > 0:
             input_tensor = torch.nn.functional.pad(input_tensor, (0, padding))
+            mask_tensor = torch.nn.functional.pad(mask_tensor, (0, padding))
         with torch.no_grad():
-            pred_ids = model(input_tensor.to(args.device).to(torch.bfloat16))
+            pred_ids = model(input_tensor, mask_tensor)
 
         # 3.2 Convert token ids to text transcription
         pred_text = tokenizer.batch_decode(pred_ids, skip_special_tokens=True)

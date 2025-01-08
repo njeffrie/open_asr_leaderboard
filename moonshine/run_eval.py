@@ -67,7 +67,9 @@ def main(args):
             warmup_dataset = dataset.take(num_warmup_samples)
         else:
             warmup_dataset = dataset.select(range(min(num_warmup_samples, len(dataset))))
-        warmup_dataset = iter(warmup_dataset.map(benchmark, batch_size=args.batch_size, batched=True, fn_kwargs={"min_new_tokens": args.max_new_tokens}))
+        warmup_dataset = warmup_dataset.map(
+            benchmark, batch_size=args.batch_size, batched=True, remove_columns=["audio"],
+        )
 
         for _ in tqdm(warmup_dataset, desc="Warming up..."):
             continue
